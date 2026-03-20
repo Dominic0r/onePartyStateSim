@@ -34,7 +34,7 @@ public class Main
             this.personality = ra.nextInt(100);
             this.charisma = ra.nextInt(100);
             this.ambition = ra.nextInt(100);
-            this.birthmonth=ra.nextInt(12);
+            this.birthmonth=ra.nextInt(4);
             allies = 0;
             influence=0;
         }
@@ -116,13 +116,13 @@ public class Main
         }
         
         public void updateInfluence(){
-            influence/=20;
+            influence=0;
             influence+= allies*5;
             influence += this.relationWith(chairman);
-            influence += this.relationWith(genSec)*3;
+            influence += this.relationWith(genSec);
             influence += this.relationWith(premier);
-            influence += this.relationWith(whip)*2;
-            influence+= (influence*(charisma/20))/10;
+            influence += this.relationWith(whip);
+            //influence+= (influence*(charisma/20))/10;
             
             if(this==chairman){
                 influence+= influence/3;
@@ -137,6 +137,9 @@ public class Main
             if(this==whip){
                 influence+= influence/10;
             }
+            
+            
+            
             
         }
         public void displayRelations(){
@@ -267,13 +270,24 @@ public class Main
     
     public static int year = 1921;
     public static int month=0;
-    public static String[] month_name= new String[]{"January","February","March","April","May","June","July","August","September","October","November","December"};
+    public static String[] month_name= new String[]{"Winter", "Spring", "Summer", "Autumn"};
     
-    public static int centCountDown=4;
-    public static int chairmanCountDown=5;
-    public static int genSecCountDown=8;
-    public static int whipCountDown=6;
-    public static int premCountDown=7;
+    public static int centCountDown=1;
+    public static int chairmanCountDown=2;
+    public static int genSecCountDown=3;
+    public static int whipCountDown=2;
+    public static int premCountDown=2;
+    
+    public static boolean canBlockElection(Person leader) {
+    if (leader == null) return false;
+    
+    // A leader is "Entrenched" if they have massive influence 
+    // or if the Party Whip is their close ally.
+    boolean hasHighInfluence = leader.getInfluence() > 800;
+    boolean whipIsAlly = (whip != null && leader.relationWith(whip) > 85);
+    
+    return hasHighInfluence || whipIsAlly;
+}
     
     public static void monthly(){
         relUpdate();
@@ -288,9 +302,9 @@ public class Main
         centCom.sort(Comparator.comparingInt((Person p)->
             p.getInfluence()
         ).reversed());
-        
+        if(whip !=null){
         purgeOpposition();
-        
+        }
         month++;
         centCountDown--;
         chairmanCountDown--;
@@ -299,30 +313,40 @@ public class Main
         premCountDown--;
         if(centCountDown==0){
             electCentCom();
-            centCountDown=12;
+            centCountDown=4;
         }
         
         if(chairmanCountDown==0){
+            if(canBlockElection(chairman) && allPersons.contains(chairman)){
+                chairmanCountDown=4;
+            }else{
             electChairman();
-            chairmanCountDown=36;
+            chairmanCountDown=12;
+            }
         }
         
         if(genSecCountDown==0){
+            if(canBlockElection(genSec) && allPersons.contains(genSec)){
+                genSecCountDown=4;
+            }else{
             electGenSec();
-            genSecCountDown=48;
+            genSecCountDown=16;
+            }
         }
         
         if(whipCountDown==0){
             electWhip();
-            whipCountDown=24;
+            whipCountDown=8;
         }
         
         if(premCountDown==0){
+            
             electPrem();
-            premCountDown=60;
+            premCountDown=12;
+            
         }
         
-        if(month == 12){
+        if(month == 4){
             
             yearly();
             
@@ -342,7 +366,7 @@ public class Main
     
     public static void checkAge(){
         List<Person> toRemove = new ArrayList<>();
-        int retage= 70;
+        int retage= 60;
         for(Person per: allPersons){
             int points = per.getAge()-retage;
             if(points > 0){
@@ -563,34 +587,91 @@ public class Main
     }
     
     public static void purgeOpposition(){
-        List<Person> opponents = new ArrayList<>(allPersons);
-        opponents.sort(Comparator.comparingInt((Person p)->
-                whip.relationWith(p)
-            ));
-            List<Person> toPurge= new ArrayList<>();
-        for(Person per: opponents){
-            if(whip.relationWith(per)<50){
-                int points = per.getNumOfAllies()*10;
-                if(centCom.contains(per)){
-                    points *=2;
-                }
-                if(chairman == per || premier== per || genSec==per){
-                    points*=5;
-                }
-                
-                if(points < 50){
-                    toPurge.add(per);
-                }
-            }
-            
-        }
-        if(toPurge!=null){
-            for(Person per: toPurge){
-                System.out.println(per.getName()+ " has been purged!");
-            }
-            allPersons.removeAll(toPurge);
+        if (whip == null || chairman == null) return;
+
+    List<Person> threats = new ArrayList<>();
+    for (Person p : allPersons) {
+        if (p == chairman) continue;
+
+        // A threat is someone with high ambition AND high influence
+        if (p.getAmbition() > 70 && p.getInfluence() > (chairman.getInfluence() * 0.7)) {
+            threats.add(p);
         }
     }
+
+    if (!threats.isEmpty()) {
+        // Higher chance to purge if the leader is paranoid (High Ambition)
+        if (ra.nextInt(100) < chairman.getAmbition()) {
+            Person target = threats.get(ra.nextInt(threats.size()));
+            //System.out.println(RED + BOLD + " [!!!] POLITICAL PURGE: " + target.getName() + " was eliminated as a rival to " + chairman.getName() + RESET);
+            allPersons.remove(target);
+        }
+    }
+    }
+    
+    
+    // --- UI HELPER METHODS ---
+    public static final String RESET = "\u001B[0m";
+    public static final String RED = "\u001B[31m";
+    public static final String GREEN = "\u001B[32m";
+    public static final String YELLOW = "\u001B[33m";
+    public static final String CYAN = "\u001B[36m";
+    public static final String BOLD = "\u001B[1m";
+
+    public static String getIdeoColor(Person p) {
+        String ideo = ideologyOf(p);
+        if (ideo.equals("Radical")) return RED;
+        if (ideo.equals("Reformist")) return GREEN;
+        if (ideo.equals("Moderate")) return CYAN;
+        return YELLOW; // Conservative
+    }
+
+    public static String drawBar(int val, int max) {
+        int bars = (int) Math.min(10, ((double) val / max) * 10);
+        return "o".repeat(Math.max(0, bars)) + "-".repeat(Math.max(0, 10 - bars));
+    }
+
+    public static void printHeader(String title) {
+        System.out.println(BOLD + "\n====================================================");
+        System.out.println("  " + title);
+        System.out.println("====================================================" + RESET);
+    }
+
+    public static void displayDashboard() {
+        // Clear screen (works on most modern terminals)
+        System.out.print("\033[H\033[2J");
+        System.out.flush();
+
+        printHeader("STATE OF THE PARTY - " + month_name[month] + " " + year);
+        
+        System.out.printf("%-20s : %s%s%s\n", "CHAIRMAN", getIdeoColor(chairman), chairman.name, RESET);
+        System.out.printf("%-20s : %s%s%s\n", "GEN-SECRETARY", getIdeoColor(genSec), genSec.name, RESET);
+        System.out.printf("%-20s : %s%s%s\n", "PREMIER", getIdeoColor(premier), premier.name, RESET);
+        System.out.printf("%-20s : %s%s%s\n", "PARTY WHIP", getIdeoColor(whip), whip.name, RESET);
+
+        printHeader("CENTRAL COMMITTEE (TOP 10 INFLUENCE)");
+        System.out.printf(BOLD + "%-20s | %-15s | %-15s\n" + RESET, "Name", "Ideology", "Influence");
+        System.out.println("----------------------------------------------------");
+        
+        int maxinf = 0;
+        for(Person per: allPersons){
+            if(per.getInfluence()>maxinf){
+                maxinf = per.getInfluence();
+            }
+        }
+        
+        int limit = Math.min(10, centCom.size());
+        for (int i = 0; i < limit; i++) {
+            Person p = centCom.get(i);
+            String color = getIdeoColor(p);
+            System.out.printf("%-20s | %s%-15s%s | %s\n", 
+                p.name, color, ideologyOf(p), RESET, drawBar(p.getInfluence(), maxinf));
+        }
+        
+        System.out.println("\n" + BOLD + "[ Press ENTER to advance ]" + RESET);
+    }
+    
+    
     
 	public static void main(String[] args) {
 		addPersons();
@@ -600,18 +681,12 @@ public class Main
 		electGenSec();
 		electWhip();
 		electPrem();
+        
 		while(true){
-		    System.out.println("Chairman: "+ chairman);
-		    System.out.println("General-Secretary: "+ genSec);
-		    System.out.println("Premier: "+ premier);
-		    System.out.println("Party Whip: "+ whip);
-    		System.out.println(month_name[month]+", "+year);
-    		System.out.println("\nCentral Commitee:");
-    		for(Person per: centCom){
-    		    System.out.println(per+ " "+ per.getInfluence());
-    		}
-    		sc.nextLine();
-    		monthly();
+		    displayDashboard();
+		    sc.nextLine();
+            System.out.println(CYAN + "Processing political shifts..." + RESET);
+		    monthly();
 		}
 		
 		
