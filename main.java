@@ -11,6 +11,11 @@ public class Main
         String name;
         int ideology, personality;
         
+        int charisma, ambition;
+        int allies;
+        
+        int influence;
+        
         Map<Person, Integer> relations = new HashMap<>();
         List<Person> relations_public = new ArrayList<>();
         
@@ -19,7 +24,11 @@ public class Main
             this.name = name;
             this.ideology = ra.nextInt(100);
             this.personality = ra.nextInt(100);
+            this.charisma = ra.nextInt(100);
+            this.ambition = ra.nextInt(100);
             this.birthmonth=ra.nextInt(12);
+            allies = 0;
+            influence=0;
         }
         
         public int getAge(){
@@ -53,6 +62,30 @@ public class Main
             return 100-totdif;
         }
         
+        public int getCharisma(){
+            return charisma;
+        }
+        public int getAmbition(){
+            return ambition;
+        }
+        
+        public int getInfluence(){
+            return influence;
+        }
+        
+        public void updateAllies(){
+            allies=0;
+            for(Person per: relations.keySet()){
+                if(relations.get(per)> 75){
+                    allies++;
+                }
+            }
+        }
+        
+        public int getNumOfAllies(){
+            return allies;
+        }
+        
         public void updateRelations(){
             relations.clear();
             relations_public.clear();
@@ -61,7 +94,9 @@ public class Main
                 int newrel = proximityWith(per);
                 
                 newrel -= (Math.abs(per.getAge()-age))/10;
-                
+                newrel+= per.getCharisma()/5;
+                newrel-=per.getAmbition()/10;
+                newrel+=per.getInfluence()/10;
                 relations.put(per, newrel);
                 relations_public.add(per);
                 }
@@ -72,20 +107,31 @@ public class Main
             ).reversed());
         }
         
+        public void updateInfluence(){
+            influence+= allies*5;
+        }
         public void displayRelations(){
             System.out.println(name+" relations");
             for(Person per: relations_public){
                 
-                System.out.println(per.getName()+ ": "+ relations.get(per));
+                System.out.print(per.getName()+ ": "+ relations.get(per));
+                if(relations.get(per)>75){
+                    System.out.println(" - Ally");
+                }else{
+                    System.out.println();
+                }
             }
         }
         
         public int relationWith(Person per){
-            return relations.get(per);
+            if(relations.keySet().contains(per)){
+                return relations.get(per);
+            }
+            return 0;
         }
         @Override
         public String toString(){
-            return name+", "+ age;
+            return name+", "+ age+ " ("+ideologyOf(this)+")";
         }
     }
     
@@ -165,7 +211,7 @@ public class Main
     }
     public static List<Person> allPersons = new ArrayList<>();
     public static void addPersons(){
-        for(int i=0; i!= 10;i++){
+        for(int i=0; i!= 50;i++){
             allPersons.add(new Person(ra.nextInt(20)+40, genName()));
         }
     }
@@ -173,6 +219,13 @@ public class Main
     public static void relUpdate(){
         for(Person per: allPersons){
             per.updateRelations();
+            per.updateAllies();
+        }
+    }
+    
+    public static void influenceUpdate(){
+        for(Person per: allPersons){
+            per.updateInfluence();
         }
     }
     
@@ -182,7 +235,15 @@ public class Main
     
     public static void monthly(){
         relUpdate();
+        influenceUpdate();
         checkBDay();
+        checkAge();
+        
+        allPersons.sort(Comparator.comparingInt((Person p)->
+            p.getInfluence()
+        ).reversed());
+        
+        
         month++;
         if(month == 12){
             
@@ -202,7 +263,7 @@ public class Main
         }
     }
     
-    public static checkAge(){
+    public static void checkAge(){
         List<Person> toRemove = new ArrayList<>();
         int retage= 70;
         for(Person per: allPersons){
@@ -213,22 +274,125 @@ public class Main
                 }
             }
         }
-        
+        if(toRemove !=null){
+            for(Person per: toRemove){
+                System.out.println(per.getName()+ " has retired!");
+            }
+        }
         allPersons.removeAll(toRemove);
     }
+    
+    
     
     public static void yearly(){
         
     }
     
+    public static String ideologyOf(Person per){
+        if(per.getIdeo()<20){
+            return "Radical";
+        }
+        if(per.getIdeo()<50){
+            return "Conservative";
+        }
+        if(per.getIdeo()<80){
+            return "Moderate";
+        }
+        if(per.getIdeo()<100){
+            return "Reformist";
+        }
+        return"";
+    }
+    
+    public static List<Person> centCom = new ArrayList<>();
+    
+    public static void electCentCom(){
+        centCom.clear();
+        int totmems = allPersons.size()/10;
+        int counter=0;
+        for(Person per: allPersons){
+            centCom.add(per);
+            counter++;
+            if(counter==totmems){
+                break;
+            }
+        }
+    }
+    
+    public static Person chairman;
+    public static void electChairman(){
+        chairman= null;
+        Map<Person, Integer> candidates = new HashMap<>();
+        for(Person per: allPersons){
+            if(per.getAmbition()+(per.getInfluence()/10)> 50){
+                candidates.put(per,0);
+            }
+        }
+        
+        if(candidates.size() ==0){
+            candidates.put(centCom.get(ra.nextInt(centCom.size())),0);
+        }
+        
+        boolean majorityFound=false;
+        
+        do{
+            
+            for(Person voter: allPersons){
+                int maxnum=-1;
+                Person maxper=null;
+                for(Person can: candidates.keySet()){
+                    int points=voter.relationWith(can);
+                    if(points > maxnum){
+                        maxper = can;
+                        maxnum = points;
+                    }
+                }
+                
+                candidates.put(maxper, candidates.get(maxper)+1);
+            }
+            
+            int maxnum=-1;
+            Person winner=null;
+            for(Person per: candidates.keySet()){
+                if(candidates.get(per)> maxnum){
+                    maxnum = candidates.get(per);
+                    winner = per;
+                }
+            }
+            
+            if(candidates.get(winner)>allPersons.size()/2){
+                chairman = winner;
+                majorityFound=true;
+            }else{
+                maxnum = Integer.MAX_VALUE;
+                Person loser = null;
+                for(Person per: candidates.keySet()){
+                if(candidates.get(per)< maxnum){
+                    maxnum = candidates.get(per);
+                    loser = per;
+                }
+                
+                 }
+                candidates.remove(loser);
+            }
+            
+        }while(!majorityFound);
+        
+    }
+    
+    
+    
 	public static void main(String[] args) {
 		addPersons();
-		
+		monthly();
+		electCentCom();
+		electChairman();
 		while(true){
+		    System.out.println("Chairman: "+ chairman);
     		System.out.println(month_name[month]+", "+year);
     		
-    		for(Person per: allPersons){
-    		    System.out.println(per);
+    		for(Person per: centCom){
+    		    System.out.println(per+ " "+ per.getInfluence());
     		}
     		sc.nextLine();
     		monthly();
