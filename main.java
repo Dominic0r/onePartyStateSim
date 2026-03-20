@@ -23,6 +23,14 @@ public class Main
             this.age = age;
             this.name = name;
             this.ideology = ra.nextInt(100);
+            if(genSec!=null){
+            if(ideology> genSec.getIdeo()){
+                ideology-= ra.nextInt(25);
+            }else if(ideology< genSec.getIdeo()){
+                ideology+= ra.nextInt(25);
+            }
+            }
+            
             this.personality = ra.nextInt(100);
             this.charisma = ra.nextInt(100);
             this.ambition = ra.nextInt(100);
@@ -108,7 +116,28 @@ public class Main
         }
         
         public void updateInfluence(){
+            influence/=20;
             influence+= allies*5;
+            influence += this.relationWith(chairman);
+            influence += this.relationWith(genSec)*3;
+            influence += this.relationWith(premier);
+            influence += this.relationWith(whip)*2;
+            influence+= (influence*(charisma/20))/10;
+            
+            if(this==chairman){
+                influence+= influence/3;
+            }
+            
+            if(this==genSec){
+                influence+= influence/2;
+            }
+            if(this==premier){
+                influence+= influence/5;
+            }
+            if(this==whip){
+                influence+= influence/10;
+            }
+            
         }
         public void displayRelations(){
             System.out.println(name+" relations");
@@ -143,7 +172,7 @@ public class Main
         "Cheng", "Cao", "Yuan", "Deng", "Xu", "Fu", "Shen", "Zeng", "Peng", "Lv",
         "Su", "Lu", "Jiang", "Cai", "Jia", "Ding", "Wei", "Xue", "Ye", "Yan",
         "Pan", "Du", "Dai", "Xia", "Zhong", "Tian", "Ren", "Jiang", "Fan", "Fang",
-        "Shi", "Yao", "Tan", "Liao", "Zou", "Xiong", "Jin", "陸", "Meng", "Mao",
+        "Shi", "Yao", "Tan", "Liao", "Zou", "Xiong", "Jin", "Huang", "Meng", "Mao",
         "Qiu", "Qin", "Jiang", "Cui", "Gu", "Hou", "Liao", "Meng", "Long", "Wan",
         "Duan", "Zhang", "Qian", "Tang", "Yin", "Li", "Yi", "Wu", "Shao", "Gu",
         "Lan", "Mo", "Kong", "Bai", "Yan", "Tao", "Mao", "Chang", "Gong", "Xing",
@@ -210,8 +239,15 @@ public class Main
         return fullname;
     }
     public static List<Person> allPersons = new ArrayList<>();
+    public static int gencomsize=  100;
     public static void addPersons(){
-        for(int i=0; i!= 50;i++){
+        for(int i=0; i!= gencomsize;i++){
+            allPersons.add(new Person(ra.nextInt(20)+40, genName()));
+        }
+    }
+    
+    public static void addNewPerson(){
+        while(allPersons.size()<gencomsize){
             allPersons.add(new Person(ra.nextInt(20)+40, genName()));
         }
     }
@@ -233,18 +269,59 @@ public class Main
     public static int month=0;
     public static String[] month_name= new String[]{"January","February","March","April","May","June","July","August","September","October","November","December"};
     
+    public static int centCountDown=4;
+    public static int chairmanCountDown=5;
+    public static int genSecCountDown=8;
+    public static int whipCountDown=6;
+    public static int premCountDown=7;
+    
     public static void monthly(){
         relUpdate();
         influenceUpdate();
         checkBDay();
         checkAge();
+        addNewPerson();
         
         allPersons.sort(Comparator.comparingInt((Person p)->
             p.getInfluence()
         ).reversed());
+        centCom.sort(Comparator.comparingInt((Person p)->
+            p.getInfluence()
+        ).reversed());
         
+        purgeOpposition();
         
         month++;
+        centCountDown--;
+        chairmanCountDown--;
+        genSecCountDown--;
+        whipCountDown--;
+        premCountDown--;
+        if(centCountDown==0){
+            electCentCom();
+            centCountDown=12;
+        }
+        
+        if(chairmanCountDown==0){
+            electChairman();
+            chairmanCountDown=36;
+        }
+        
+        if(genSecCountDown==0){
+            electGenSec();
+            genSecCountDown=48;
+        }
+        
+        if(whipCountDown==0){
+            electWhip();
+            whipCountDown=24;
+        }
+        
+        if(premCountDown==0){
+            electPrem();
+            premCountDown=60;
+        }
+        
         if(month == 12){
             
             yearly();
@@ -380,17 +457,156 @@ public class Main
         
     }
     
+    public static Person genSec;
+    public static void electGenSec(){
+        genSec= null;
+        Map<Person, Integer> candidates = new HashMap<>();
+        for(Person per: centCom){
+            if(per.getAmbition()+(per.getInfluence()/10)> 50){
+                candidates.put(per,0);
+            }
+        }
+        
+        if(candidates.size() ==0){
+            candidates.put(centCom.get(ra.nextInt(centCom.size())),0);
+        }
+        
+        boolean majorityFound=false;
+        
+        do{
+            
+            for(Person voter: centCom){
+                int maxnum=-1;
+                Person maxper=null;
+                for(Person can: candidates.keySet()){
+                    int points=voter.relationWith(can);
+                    if(points > maxnum){
+                        maxper = can;
+                        maxnum = points;
+                    }
+                }
+                
+                candidates.put(maxper, candidates.get(maxper)+1);
+            }
+            
+            int maxnum=-1;
+            Person winner=null;
+            for(Person per: candidates.keySet()){
+                if(candidates.get(per)> maxnum){
+                    maxnum = candidates.get(per);
+                    winner = per;
+                }
+            }
+            
+            if(candidates.get(winner)>centCom.size()/2){
+                genSec = winner;
+                majorityFound=true;
+            }else{
+                maxnum = Integer.MAX_VALUE;
+                Person loser = null;
+                for(Person per: candidates.keySet()){
+                if(candidates.get(per)< maxnum){
+                    maxnum = candidates.get(per);
+                    loser = per;
+                }
+                
+                 }
+                candidates.remove(loser);
+            }
+            
+        }while(!majorityFound);
+        
+    }
     
+    public static Person whip;
+    public static void electWhip(){
+        int maxnum=-1;
+        Person maxper=null;
+        for(Person per: allPersons){
+            if(per!=chairman){
+                if(chairman.relationWith(per)>maxnum){
+                    if(per.getAmbition()<50){
+                        maxnum=chairman.relationWith(per);
+                        maxper = per;
+                    }
+                }
+            }
+        }
+        
+        whip = maxper;
+    }
+    
+    public static Person premier;
+    public static void electPrem(){
+       
+        List<Person> candidates = new ArrayList<>(allPersons);
+        
+        candidates.sort(Comparator.comparingInt((Person p)->
+                chairman.relationWith(p)
+            ).reversed());
+        int votes=0;
+        for(Person can: candidates){
+            votes=0;
+            
+            for(Person per: allPersons){
+                if(per.relationWith(can)> 50){
+                    votes++;
+                }
+            }
+            
+            if(votes> allPersons.size()/2){
+                premier = can;
+                break;
+                
+            }
+        }
+    }
+    
+    public static void purgeOpposition(){
+        List<Person> opponents = new ArrayList<>(allPersons);
+        opponents.sort(Comparator.comparingInt((Person p)->
+                whip.relationWith(p)
+            ));
+            List<Person> toPurge= new ArrayList<>();
+        for(Person per: opponents){
+            if(whip.relationWith(per)<50){
+                int points = per.getNumOfAllies()*10;
+                if(centCom.contains(per)){
+                    points *=2;
+                }
+                if(chairman == per || premier== per || genSec==per){
+                    points*=5;
+                }
+                
+                if(points < 50){
+                    toPurge.add(per);
+                }
+            }
+            
+        }
+        if(toPurge!=null){
+            for(Person per: toPurge){
+                System.out.println(per.getName()+ " has been purged!");
+            }
+            allPersons.removeAll(toPurge);
+        }
+    }
     
 	public static void main(String[] args) {
 		addPersons();
 		monthly();
 		electCentCom();
 		electChairman();
+		electGenSec();
+		electWhip();
+		electPrem();
 		while(true){
 		    System.out.println("Chairman: "+ chairman);
+		    System.out.println("General-Secretary: "+ genSec);
+		    System.out.println("Premier: "+ premier);
+		    System.out.println("Party Whip: "+ whip);
     		System.out.println(month_name[month]+", "+year);
-    		
+    		System.out.println("\nCentral Commitee:");
     		for(Person per: centCom){
     		    System.out.println(per+ " "+ per.getInfluence());
     		}
